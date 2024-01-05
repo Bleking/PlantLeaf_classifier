@@ -80,3 +80,58 @@ model = Net().to(DEVICE)
 # 최적화 및 손실 함수 정의
 criterion = nn.CrossEntropyLoss()
 optimizer = optim.Adam(model.parameters(), lr=0.001)
+
+def evaluate(model, dataloader):
+  model.eval()
+  loss = 0
+  correct = 0
+  total = 0
+
+  with torch.no_grad():
+    for data, target in dataloader:
+      data, target = data.to(DEVICE), target.to(DEVICE)
+      output = model(data)
+
+      loss += criterion(output, target).item()
+
+      _, prediction = output.max(1)
+      total += target.size(0)
+      # correct += (prediction == torch.argmax(target, dim=1)).sum().item()
+      correct += prediction.eq(target).sum().item()
+  
+  loss /= len(dataloader.dataset)
+  accuracy = 100.0 * correct / total
+
+  return loss, accuracy
+
+
+best_acc = 0.0
+best_model = copy.deepcopy(model.state_dict())
+
+for epoch in range(1, 30 + 1):
+  start = time.time()
+
+  model.train()
+  for batch, (data, target) in enumerate(train_loader):
+    data, target = data.to(DEVICE), target.to(DEVICE)
+
+    optimizer.zero_grad()
+    output = model(data)
+    loss = criterion(output, target)
+    loss.backward()
+    optimizer.step()
+
+  train_loss, train_acc = evaluate(model, train_loader)
+  val_loss, val_acc = evaluate(model, valid_loader)
+
+  if val_acc > best_acc:
+    best_acc = val_acc
+    best_model = copy.deepcopy(model.state_dict())
+
+  time_elapsed = time.time() - start
+  print("\nEPOCH {}".format(epoch))
+  print('train Loss: {:.4f}, Accuracy: {:.2f}%'.format(train_loss, train_acc))   
+  print('val Loss: {:.4f}, Accuracy: {:.2f}%'.format(val_loss, val_acc))
+  print('Completed in {:.0f}m {:.0f}s'.format(time_elapsed // 60, time_elapsed % 60))
+
+torch.save(model.load_state_dict(best_model), 'plantleaf_cls.pt')
